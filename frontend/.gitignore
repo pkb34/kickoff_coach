@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.py[cod]
+data/*.sqlite3
+data/*.sqlite3-*
+records/audio_transcript.txt
+records/original_project_audio.m4a

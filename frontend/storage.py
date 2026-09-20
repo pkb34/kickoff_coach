@@ -95,6 +95,18 @@ def save_collection_submission(record: dict, transcript: list[dict], result: dic
     }
 
 
+def update_collection_result(record_id: str, result: dict) -> None:
+    """Persist a later optional Gemini briefing for one existing record."""
+    with closing(_connect()) as connection:
+        with connection:
+            cursor = connection.execute(
+                "UPDATE collection_submissions SET result_json = ? WHERE id = ?",
+                (json.dumps(result, ensure_ascii=False), record_id),
+            )
+            if cursor.rowcount != 1:
+                raise ValueError("The saved collection record was not found.")
+
+
 def migrate_legacy_results() -> int:
     """Replace Chinese demo feedback stored by earlier versions with English feedback."""
     updates = []

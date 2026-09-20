@@ -1,4 +1,4 @@
-"""Conversational student-information collection UI."""
+"""Three starting questions followed by local adaptive follow-ups."""
 
 from __future__ import annotations
 
@@ -6,88 +6,117 @@ import sqlite3
 
 import streamlit as st
 
-from collection_gateway import correct_answer, start_session, submit_turn
-from collector import FIELDS, baseline_for_demo_result, coverage, structured_record
-from engine import assign_demo_personality
+from analysis_agent import analyze_record
+from engine import assign_local_demo_personality
+from football_matches import match_football_identity
+from local_question_agent import (
+    BASELINE_SPECS, STARTING_QUESTIONS, answer_question,
+    baseline_for_demo_personality, start_agent, structured_record, validate_baseline,
+)
 from storage import save_collection_submission
 
 
-if "collection_state" not in st.session_state:
-    st.session_state["collection_state"] = start_session()
-
-state = st.session_state["collection_state"]
-covered = coverage(state["fields"])
-done = len(covered["answered"]) + len(covered["unavailable"])
-
-st.caption("WCPT · INFORMATION CHECK")
+st.caption("WCPT · LOCAL QUESTION AGENT")
 st.title("⚽ Tell Us About Your Week")
-st.write("Answer a few questions about sleep, classes and GPA, activities, and study time. Each answer helps choose the next question.")
-st.info("Demo collector: this version understands short numbers and listed choices. A future agent will handle natural-language answers and deeper clarification. Please do not enter your name or other identifying details.")
-st.progress(done / len(covered["required"]))
-st.caption(f"{done} of {len(covered['required'])} needed details covered · {len(covered['unavailable'])} unavailable")
+st.write("Begin with three short questions. A local question agent then chooses follow-ups based on your answers.")
+st.info("Question selection runs locally. On the result page, you may choose to send a small numeric summary to Gemini for a briefing; raw replies stay local. Please avoid entering names or other identifying details.")
 
-for message in state["messages"]:
-    with st.chat_message(message["role"]):
-        st.write(message["content"])
+state = st.session_state.get("local_agent_state")
 
-if state["status"] == "collecting":
-    field = state["current_field"]
-    st.caption("You can also answer: I don't know · Prefer not to say")
-    with st.form(f"answer_{field}_{state['turn_count']}", clear_on_submit=True):
-        answer = st.text_input("Your answer", max_chars=500, key=f"answer_text_{state['turn_count']}")
-        sent = st.form_submit_button("Send Answer", type="primary", use_container_width=True)
-    if sent:
+if state is None:
+    prior = st.session_state.get("starting_answers", {})
+    st.subheader("Three starting questions")
+    st.caption("Enter a number of hours, 'I don't know', or 'Prefer not to say' for a field you cannot answer.")
+    with st.form("three_starting_questions"):
+        st.markdown(f"**1. {STARTING_QUESTIONS[0]}**")
+        activity_type = st.text_input("Main activity type", value=prior.get("activity_type", ""), placeholder="e.g. soccer club, volunteering, or none")
+        activity_hours = st.text_input("Activity hours per week", value=prior.get("activity_hours", ""), placeholder="e.g. 4")
+
+        st.divider()
+        st.markdown(f"**2. {STARTING_QUESTIONS[1]}**")
+        class_hours = st.text_input("Scheduled class hours per week", value=prior.get("class_hours", ""), placeholder="e.g. 15")
+        weekday_study = st.text_input("Study hours on a typical weekday, outside class", value=prior.get("weekday_study_hours", ""), placeholder="e.g. 2")
+        weekend_study = st.text_input("Study hours on a typical weekend day, outside class", value=prior.get("weekend_study_hours", ""), placeholder="e.g. 3")
+
+        st.divider()
+        st.markdown(f"**3. {STARTING_QUESTIONS[2]}**")
+        sleep_hours = st.text_input("Average sleep hours per night", value=prior.get("sleep_hours", ""), placeholder="e.g. 7.5")
+        submitted = st.form_submit_button("Start Personalized Follow-ups", type="primary", use_container_width=True)
+
+    if submitted:
+        raw = {
+            "activity_type": activity_type, "activity_hours": activity_hours,
+            "class_hours": class_hours, "weekday_study_hours": weekday_study,
+            "weekend_study_hours": weekend_study, "sleep_hours": sleep_hours,
+        }
         try:
-            st.session_state["collection_state"] = submit_turn(state, answer)
+            baseline = validate_baseline(raw)
+            st.session_state["starting_answers"] = raw
+            st.session_state["local_agent_state"] = start_agent(baseline)
             st.rerun()
         except ValueError as error:
             st.error(str(error))
 
-if state["fields"]:
-    with st.expander("Review or correct collected details", expanded=state["status"] == "review"):
-        for key, detail in state["fields"].items():
-            spec = FIELDS[key]
-            shown = detail["value"] if detail["status"] == "answered" else detail["status"].replace("_", " ").title()
-            if key == "sleep_quality" and detail["status"] == "answered":
-                shown = str(shown).replace("_", " ").title()
-            unit = f" {spec['unit']}" if detail["status"] == "answered" and spec["unit"] and key != "gpa" else ""
-            if key == "gpa" and detail["status"] == "answered":
-                unit = " (0–4.0 scale)"
-            st.write(f"**{spec['label']}:** {shown}{unit}")
-        editable = [key for key in state["fields"] if state["fields"][key]["status"] != "not_applicable"]
-        with st.form("correction_form", clear_on_submit=True):
-            correction_field = st.selectbox("Correct a detail", editable, format_func=lambda key: FIELDS[key]["label"])
-            correction_value = st.text_input("Correct value", max_chars=500)
-            corrected = st.form_submit_button("Save Correction")
-        if corrected:
+else:
+    answered = len(state["answers"])
+    if state["status"] == "asking":
+        st.caption(f"Starting questions: 3 complete · Deeper follow-up: {answered + 1} of approximately 8–10")
+    else:
+        st.caption(f"All topics addressed · {3 + answered} questions total ({answered} deeper follow-ups)")
+
+    with st.expander("Your three starting answers"):
+        for key, detail in state["baseline"]["fields"].items():
+            value = detail["value"] if detail["status"] == "answered" else detail["status"].replace("_", " ").title()
+            suffix = f" {detail['unit']}" if detail["status"] == "answered" and detail["unit"] else ""
+            st.write(f"**{BASELINE_SPECS[key]['label']}:** {value}{suffix}")
+
+    for message in state["messages"]:
+        with st.chat_message(message["role"]):
+            st.write(message["content"])
+
+    if state["status"] == "asking":
+        with st.form(f"deep_answer_{answered}", clear_on_submit=True):
+            if state["current_question_id"] == "wellbeing_rating":
+                reply = st.text_input("Your 0–10 rating", placeholder="e.g. 7")
+            else:
+                reply = st.text_area("Your answer", max_chars=800, placeholder="A few sentences are enough.")
+            sent = st.form_submit_button("Send Answer", type="primary", use_container_width=True)
+        if sent:
             try:
-                st.session_state["collection_state"] = correct_answer(state, correction_field, correction_value)
+                st.session_state["local_agent_state"] = answer_question(state, reply)
                 st.rerun()
             except ValueError as error:
                 st.error(str(error))
+        if st.button("Prefer not to answer this question"):
+            st.session_state["local_agent_state"] = answer_question(state, "Prefer not to say")
+            st.rerun()
 
-if state["status"] == "review":
-    record = structured_record(state)
-    if covered["unavailable"]:
-        st.warning("Some details were marked unavailable. They will remain missing in the final record, and a demo personality may not be available.")
-    st.caption("Review the record above, make any corrections, then confirm. The transcript and structured record will be saved locally.")
-    with st.expander("Preview structured record"):
-        st.json(record)
-    if st.button("Confirm and See My Result", type="primary", use_container_width=True):
-        try:
-            baseline = baseline_for_demo_result(record)
-            result = (
-                {"status": "demo_personality", "personality": assign_demo_personality(baseline)}
-                if baseline else {"status": "insufficient_data", "personality": None}
-            )
-            st.session_state["latest_submission"] = save_collection_submission(record, state["messages"], result)
-            st.switch_page("views/result.py")
-        except (OSError, sqlite3.Error):
-            st.error("Unable to save the record. Check the data directory and try again.")
+    else:
+        record = structured_record(state)
+        st.subheader("Review your information")
+        st.write("Your three starting answers and follow-up responses are ready to save. You can inspect the structured record first.")
+        with st.expander("Preview complete structured record"):
+            st.json(record)
+        if st.button("Confirm and See My Result", type="primary", use_container_width=True):
+            try:
+                baseline = baseline_for_demo_personality(record)
+                result = (
+                    {"status": "demo_personality", "personality": assign_local_demo_personality(baseline)}
+                    if baseline else {"status": "insufficient_data", "personality": None}
+                )
+                result["analysis"] = analyze_record(record)
+                result["football_match"] = (
+                    match_football_identity(result["personality"]) if result["personality"] else None
+                )
+                result["gemini"] = {"status": "not_requested"}
+                st.session_state["latest_submission"] = save_collection_submission(record, state["messages"], result)
+                st.switch_page("views/result.py")
+            except (OSError, sqlite3.Error):
+                st.error("Unable to save your answers locally. Please try again.")
 
-if st.button("Start This Information Check Again"):
-    st.session_state["collection_state"] = start_session()
-    st.session_state.pop("latest_submission", None)
-    st.rerun()
+    if st.button("Change Starting Answers / Start Over"):
+        st.session_state.pop("local_agent_state", None)
+        st.session_state.pop("latest_submission", None)
+        st.rerun()
 
-st.caption("No AI assessment or GPA, sleep, or wellbeing prediction is performed in this prototype.")
+st.caption("The local question agent is a rule-based prototype. Its questions and the football result are not validated assessments.")

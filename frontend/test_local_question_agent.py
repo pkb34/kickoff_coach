@@ -15,7 +15,7 @@ BASELINE = {
 
 
 class LocalQuestionAgentTests(unittest.TestCase):
-    def test_three_starting_eight_deep_eleven_total(self):
+    def test_three_starting_seven_deep_ten_total(self):
         state = start_agent(validate_baseline(BASELINE))
         while state["status"] == "asking":
             self.assertIsNone(PROHIBITED.search(state["messages"][-1]["content"]))
@@ -23,12 +23,15 @@ class LocalQuestionAgentTests(unittest.TestCase):
             state = answer_question(state, reply)
         record = structured_record(state)
         self.assertEqual(len(STARTING_QUESTIONS), 3)
-        self.assertEqual(record["question_count"], {"starting": 3, "deep": 8, "total": 11})
+        self.assertEqual(record["question_count"], {"starting": 3, "deep": 7, "total": 10})
         self.assertTrue(record["coverage"]["complete"])
         self.assertEqual(record["followups"]["wellbeing_rating"]["value"], 7)
         self.assertNotIn("gpa", json.dumps(record).lower())
+        self.assertEqual(state["status"], "complete")
+        self.assertEqual(len(state["asked_ids"]), len(set(state["asked_ids"])))
+        self.assertEqual(len([item for item in state["messages"] if item["role"] == "assistant"]), 7)
 
-    def test_baseline_and_replies_trigger_up_to_ten_deep(self):
+    def test_short_sleep_triggers_one_personal_followup(self):
         raw = {**BASELINE, "activity_hours": "10", "weekday_study_hours": "1",
                "weekend_study_hours": "4", "sleep_hours": "6"}
         state = start_agent(validate_baseline(raw))
@@ -36,20 +39,18 @@ class LocalQuestionAgentTests(unittest.TestCase):
             reply = "7" if state["current_question_id"] == "wellbeing_rating" else "It feels manageable for me."
             state = answer_question(state, reply)
         record = structured_record(state)
-        self.assertEqual(record["question_count"], {"starting": 3, "deep": 10, "total": 13})
-        self.assertIn("activity_tradeoff", record["followups"])
-        self.assertIn("study_variation", record["followups"])
+        self.assertEqual(record["question_count"], {"starting": 3, "deep": 8, "total": 11})
+        self.assertIn("sleep_barrier", record["followups"])
         self.assertIn("wellbeing_rating", record["followups"])
 
-    def test_response_can_trigger_personalized_connection_question(self):
+    def test_low_self_rating_can_trigger_support_question(self):
         state = start_agent(validate_baseline(BASELINE))
         while state["status"] == "asking":
-            reply = ("7" if state["current_question_id"] == "wellbeing_rating" else
-                     "I feel isolated on campus." if state["current_question_id"] == "campus_belonging" else
+            reply = ("3" if state["current_question_id"] == "wellbeing_rating" else
                      "It feels manageable for me.")
             state = answer_question(state, reply)
-        self.assertIn("connection_step", state["answers"])
-        self.assertEqual(len(state["answers"]), 9)
+        self.assertIn("support_preference", state["answers"])
+        self.assertEqual(len(state["answers"]), 8)
 
     def test_happiness_rating_requires_a_direct_number(self):
         state = start_agent(validate_baseline(BASELINE))
@@ -59,10 +60,10 @@ class LocalQuestionAgentTests(unittest.TestCase):
             answer_question(state, "I feel fine")
         self.assertNotIn("wellbeing_rating", state["answers"])
 
-    def test_reply_word_variants_trigger_relevant_question(self):
+    def test_reply_moves_to_next_relevant_question(self):
         state = start_agent(validate_baseline(BASELINE))
         state = answer_question(state, "Volunteering conflicts with my study time.")
-        self.assertEqual(state["current_question_id"], "activity_tradeoff")
+        self.assertEqual(state["current_question_id"], "class_experience")
         self.assertIsNone(PROHIBITED.search(state["messages"][-1]["content"]))
 
     def test_mark_related_question_is_blocked_and_not_saved(self):

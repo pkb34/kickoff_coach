@@ -12,17 +12,19 @@ This is the active standard for the local information-collection agent. The inte
 
 The page presents **three** questions, with separate inputs where one question asks for multiple values. Every field may be answered, marked `unknown`, or marked `declined`. If activity hours are zero, activity type becomes `not_applicable`. The active schema has no academic-mark field; question text, prompts, and structured outputs must not request it.
 
+The student UI uses seven time bands for each numeric field, with smaller bands near common answers and wider bands at the extremes. The structured field stores the selected `display` label and `[minimum, maximum]` `range`; `value` is the midpoint estimate for older integrations and must not be shown as an exact student answer. Older exact numeric submissions remain valid and are represented as point intervals in the analysis. The validation ranges in the table above are backend compatibility limits, not the current UI choices.
+
 ## Deeper follow-ups
 
-The local agent asks eight core questions covering activity balance, classroom experience, study routine, learning barriers, sleep quality, a direct 0–10 seven-day happiness rating, campus belonging, and support preferences. It can add up to two targeted questions about activity tradeoffs, study variation, sleep barriers, or a desired connection step. Selection depends on the reported hours and follow-up replies. This yields **8–10 deeper questions, 11–13 total**.
+The local agent asks seven core questions covering activity balance, classroom experience, study routine, learning barriers, self-reported academic progress without marks, sleep quality, and a direct 0–10 rating of how the student feels lately. It can add one targeted open question about sleep barriers or desired support. Selection depends on reported hours and follow-up replies. This yields **7–8 deeper questions, 10–11 total**.
 
 The current engine uses a fixed question bank and deterministic triggers. Student replies are stored as text; the engine does not claim to understand arbitrary language. A student can skip a follow-up. Missing information is recorded explicitly and is never filled with a guessed value. Generated question text and user replies pass a scope guard for academic-mark requests or disclosure.
 
-## Record and review
+## Record and handoff
 
-`local_question_agent.structured_record()` returns schema `2.0` with `baseline`, `followups`, `coverage`, and `question_count`. Each baseline field has `status`, `value`, and `unit`; each follow-up has its question, answer/status, and topic. The UI shows the record before confirmation. Changing the starting answers restarts the deeper sequence; editing individual follow-up replies is future work. Confirmation saves the record and transcript in local SQLite.
+`local_question_agent.structured_record()` returns schema `2.0` with `baseline`, `followups`, `coverage`, and `question_count`. Each baseline field has `status`, `value`, and `unit`; each follow-up has its question, answer/status, and topic. After the final answer, the UI saves the record and transcript in local SQLite and opens the result directly. Students can restart the test; editing individual replies is future work.
 
-The result is an illustrative football label based on available time fields, not a validated student assessment. When a required numeric value is unknown or declined, it leaves the personality unassigned. The happiness index displays only the student's direct rating multiplied by ten; a declined or unknown rating stays unavailable. No sleep or wellbeing prediction is calculated. The optional Gemini future-moments paragraph is a possible scenario, not a prediction.
+The result is an illustrative football label inferred from four contextual answers, not a validated student assessment. When an axis answer is missing, the type remains unassigned rather than guessed. The happiness index displays only the student's direct rating multiplied by ten; a declined or unknown rating stays unavailable. No sleep or wellbeing prediction is calculated. The optional Gemini future-moments paragraph is a possible scenario, not a prediction.
 
 ## Later study-design decisions
 

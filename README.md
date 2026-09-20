@@ -2,6 +2,8 @@
 
 PitchSide / Kickoff Coach is a Python Streamlit hackathon project with a student-facing football personality experience and separate backend work.
 
+The current frontend is the v8 still-image version. Its welcome page offers the main quiz button and a small link to a separate password-protected staff dashboard. See [`frontend/README.md`](frontend/README.md) for the two local run commands; the dashboard charts display category labels horizontally.
+
 ## Frontend prototype
 
 The Python/Streamlit student-facing prototype lives in [`frontend/`](frontend/). It includes a welcome page, a conversational information check driven by a local rule-based question agent, and a football-personality result page. A local analysis agent prepares descriptive results. Gemini can optionally create a narrative briefing after the student requests it. These agents have not yet been integrated with the separate backend.

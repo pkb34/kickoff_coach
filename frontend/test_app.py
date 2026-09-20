@@ -5,13 +5,11 @@ from pathlib import Path
 from streamlit.testing.v1 import AppTest
 
 import storage
-from analysis_agent import analyze_record
-from engine import assign_local_demo_personality
-from football_matches import match_football_identity
 from local_question_agent import (
-    answer_question, baseline_for_demo_personality, start_agent,
+    answer_question, start_agent,
     structured_record, validate_baseline,
 )
+from wpti_types import BEHAVIOR_CHOICES, infer_profile_from_record
 
 
 BASELINE_RAW = {
@@ -22,6 +20,30 @@ BASELINE_RAW = {
 
 
 class AppTests(unittest.TestCase):
+    def test_academic_question_has_art_and_voice_only_on_open_question(self):
+        app = AppTest.from_file("app.py").run()
+        state = start_agent(validate_baseline({**BASELINE_RAW, "sleep_hours": "6"}))
+        app.session_state["local_agent_state"] = state
+        app.switch_page("views/quiz.py").run()
+        self.assertFalse(app.exception)
+        self.assertFalse(any("Prefer speaking?" in item.label for item in app.expander))
+
+        while state["current_question_id"] != "academic_progress":
+            question_id = state["current_question_id"]
+            state = answer_question(state, BEHAVIOR_CHOICES[question_id][0][0])
+        app.session_state["local_agent_state"] = state
+        app.switch_page("views/quiz.py").run()
+        self.assertFalse(app.exception)
+        self.assertFalse(any("Prefer speaking?" in item.label for item in app.expander))
+
+        state = answer_question(state, "Feeling on track")
+        state = answer_question(state, "Usually tired")
+        self.assertEqual(state["current_question_id"], "sleep_barrier")
+        app.session_state["local_agent_state"] = state
+        app.switch_page("views/quiz.py").run()
+        self.assertFalse(app.exception)
+        self.assertTrue(any("Prefer speaking?" in item.label for item in app.expander))
+
     def test_welcome_local_agent_and_result_render(self):
         with tempfile.TemporaryDirectory() as directory:
             old_path = storage.DB_PATH
@@ -29,33 +51,50 @@ class AppTests(unittest.TestCase):
             try:
                 app = AppTest.from_file("app.py").run()
                 self.assertFalse(app.exception)
-                self.assertEqual(app.button[0].label, "Let's play")
+                self.assertEqual(app.button[0].label, "Discover My WPTI")
+                app.toggle[0].set_value(True).run()
+                self.assertFalse(app.exception)
+                self.assertTrue(app.session_state["audio_enabled"])
 
                 app.switch_page("views/quiz.py").run()
                 self.assertFalse(app.exception)
-                self.assertEqual(len(app.text_input), 6)
-                self.assertFalse(any("GPA" in item.label for item in app.text_input))
+                self.assertEqual(len(app.text_input), 0)
+                self.assertTrue(any(item.label == "Usual sleep per night" for item in app.radio))
+                self.assertFalse(any("GPA" in item.label for item in app.radio))
 
                 state = start_agent(validate_baseline(BASELINE_RAW))
                 app.session_state["local_agent_state"] = state
                 app.switch_page("views/quiz.py").run()
                 self.assertFalse(app.exception)
-                self.assertEqual(len(app.text_area), 1)
+                self.assertTrue(len(app.text_area) == 1 or len(app.radio) >= 1)
+                app.radio[0].set_value(BEHAVIOR_CHOICES["activity_balance"][0][0])
+                next_button = next(button for button in app.button if button.label == "Send my answer")
+                next_button.click().run()
+                self.assertFalse(app.exception)
+                self.assertEqual(app.session_state["local_agent_state"]["current_question_id"], "class_experience")
+                self.assertEqual(len([m for m in app.session_state["local_agent_state"]["messages"]
+                                      if m["role"] == "assistant"]), 2)
 
                 while state["status"] == "asking":
-                    reply = "7" if state["current_question_id"] == "wellbeing_rating" else "It feels manageable for me."
+                    question_id = state["current_question_id"]
+                    reply = ("7" if question_id == "wellbeing_rating" else
+                             BEHAVIOR_CHOICES[question_id][0][0] if question_id in BEHAVIOR_CHOICES else
+                             "It feels manageable for me.")
                     state = answer_question(state, reply)
                 record = structured_record(state)
-                baseline = baseline_for_demo_personality(record)
-                result = {"status": "demo_personality", "personality": assign_local_demo_personality(baseline)}
-                result["analysis"] = analyze_record(record)
-                result["football_match"] = match_football_identity(result["personality"])
-                result["gemini"] = {"status": "not_requested"}
-                app.session_state["latest_submission"] = storage.save_collection_submission(record, state["messages"], result)
+                app.session_state["local_agent_state"] = state
+                app.switch_page("views/quiz.py").run()
+                self.assertFalse(app.exception)
+                wpti = infer_profile_from_record(record)
+                self.assertEqual(wpti["code"], "GCPT")
+                self.assertEqual(app.session_state["latest_submission"]["result"]["wpti"]["code"], "GCPT")
                 app.switch_page("views/result.py").run()
                 self.assertFalse(app.exception)
-                self.assertEqual(len(app.metric), 3)
+                self.assertEqual(len(app.metric), 4)
+                self.assertTrue(any(metric.label == "How you feel lately" for metric in app.metric))
+                self.assertTrue(any("national team vibe" in str(item.value).lower() for item in app.markdown))
                 self.assertFalse(any("GPA" in metric.label for metric in app.metric))
+                self.assertFalse(any(item.value == "Your Player Analogy" for item in app.subheader))
             finally:
                 storage.DB_PATH = old_path
 

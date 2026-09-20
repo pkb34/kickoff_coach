@@ -34,6 +34,22 @@ class Response(BytesIO):
 
 
 class AnalysisAgentTests(unittest.TestCase):
+    def test_time_band_answers_keep_their_ranges(self):
+        raw = {
+            "activity_type": "Arts or music", "activity_hours": "4–6h",
+            "class_hours": "14–16h", "weekday_study_hours": "1h",
+            "weekend_study_hours": "3–4h", "sleep_hours": "7h",
+        }
+        state = start_agent(validate_baseline(raw))
+        while state["status"] == "asking":
+            reply = "7" if state["current_question_id"] == "wellbeing_rating" else "It feels manageable."
+            state = answer_question(state, reply)
+        analysis = analyze_record(structured_record(state))
+        ranges = analysis["metrics"]["time_ranges"]
+        self.assertEqual(ranges["weekly_extracurricular_hours"], [4.0, 6.0])
+        self.assertEqual(ranges["weekly_independent_study_hours"], [11.0, 13.0])
+        self.assertEqual(gemini_summary(analysis)["time_ranges"]["weekly_independent_study_hours"], [11.0, 13.0])
+
     def test_direct_rating_and_time_arithmetic(self):
         analysis = analyze_record(sample_record())
         self.assertEqual(analysis["metrics"]["self_reported_happiness_index"], 70)
@@ -82,6 +98,8 @@ class AnalysisAgentTests(unittest.TestCase):
         self.assertIn("assignment_start_style", sent["body"])
         self.assertNotIn("VT-DEMO-001", sent["body"])
         self.assertNotIn("Private source field", sent["body"])
+        self.assertIn("tied to reported study, activity, class, or sleep time", sent["body"])
+        self.assertIn("do not describe it as this student's data", sent["body"])
         self.assertEqual(gemini_summary(analysis)["self_reported_happiness_index"], 70)
 
     def test_api_rejection_does_not_break_local_analysis(self):
@@ -94,11 +112,12 @@ class AnalysisAgentTests(unittest.TestCase):
         self.assertEqual(briefing["status"], "unavailable")
         self.assertEqual(analysis["metrics"]["self_reported_happiness_index"], 70)
 
-    def test_every_demo_role_has_team_and_player(self):
+    def test_every_demo_role_has_a_team_without_player_analogy(self):
         for role in MATCHES:
             match = match_football_identity(role)
             self.assertTrue(match["national_team"])
-            self.assertTrue(match["player"])
+            self.assertNotIn("player", match)
+            self.assertNotIn("player_explanation", match)
             self.assertTrue(match["team_source"].startswith("https://"))
 
 

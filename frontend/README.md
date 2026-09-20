@@ -1,16 +1,20 @@
 # WCPT: World Cup Personality Test
 
-A three-page Streamlit prototype written in Python. The generated chibi soccer illustration in `static/soccer_background.png` appears behind the pages. Styling is applied from Python in `app.py`.
+This is a three-page, Python-only Streamlit prototype. Question selection and data processing run locally. The result page has an optional Gemini briefing requested by the student. The football artwork is stored in `static/soccer_background.png`.
 
-## Pages
+## Current flow
 
-1. **Welcome:** the background image, one randomly selected attributed player quote, and the **Start WCPT** button.
-2. **Information check:** a conversational sequence asks about nightly sleep, weekly class hours and GPA, extracurricular hours, and average daily study time on weekdays and weekends. It asks conditional follow-ups, shows coverage, and lets the student correct the extracted record before confirmation.
-3. **Result:** one of four illustrative football personalities (Midfielder, Captain, Penalty Striker, or Defender) when all six numeric baseline values are available. The user can ask **The Gaffer** for a Gemini-powered, encouraging briefing based on their confirmed check-in. It is not a prediction, diagnosis, or academic decision.
+1. **Welcome:** football artwork, a randomly selected player quote, and **Start WCPT**.
+2. **Quiz:** three starting question groups cover extracurricular activity type and weekly time; weekly class hours and study time outside class on weekdays and weekends; and average nightly sleep. The local question agent then asks eight required deeper questions, including a direct 0–10 seven-day happiness rating, and up to two conditional questions. The full quiz has 11–13 questions.
+3. **Result:** a local data-processing agent calculates descriptive time-use measures and displays the direct happiness rating scaled to 0–100. An illustrative rule selects one of four football roles; each role maps to a historical national-team style and player analogy. Students can request a Gemini briefing with a possible future-moments paragraph. Numerical future predictions are not implemented.
 
-WCPT means **World Cup Personality Test**. `collection_gateway.py` is the integration point for the future information-collection agent. Today it uses a transparent rule-based demo in `collector.py`. The demo accepts short numeric answers and listed choices, then chooses the next question. It does **not** understand arbitrary natural language. The result is assigned by a small demonstration rule in `engine.py` using the six numeric baseline values only. It is not an AI assessment or a validated prediction. The app does not predict GPA, sleep, or wellbeing.
+The active question agent is `local_question_agent.py`. It uses transparent Python rules to choose questions from a local bank based on the student's answers. It is **not** a locally hosted language model and does not generate arbitrary new prose. Exact wording for the three starting questions can be revised when the project owner supplies it. The quiz and result pages are `views/quiz.py` and `views/result.py`.
 
-## Run
+The local analysis is `analysis_agent.py`. Its happiness index is **only the student's own 0–10 answer multiplied by ten**; it is not a validated wellbeing scale. `football_matches.py` holds editable team/player analogies and links to football sources. `gemini_gateway.py` makes the only active external API request. It sends numeric time summaries, the self-rating, and answer-availability flags. It does **not** send names, activity descriptions, free-text replies, or the transcript. Gemini text is shown as a possible scenario, not a forecast.
+
+**Current scope rule:** the quiz must never ask about academic marks or grade point average. The active baseline schema does not contain that field. The older `collector.py`, `collection_gateway.py`, and `followups.py` are legacy code retained for old records/tests; they are not imported by the active quiz. Do not reconnect them to the quiz.
+
+## Run locally
 
 From this directory in PowerShell:
 
@@ -20,18 +24,16 @@ py -3.14 -m venv .venv
 .\.venv\Scripts\python.exe -m streamlit run app.py --server.address 127.0.0.1 --server.port 8502 --browser.gatherUsageStats false
 ```
 
-Open <http://127.0.0.1:8502/>. If the port is occupied, change the port number.
-
-## Gemini setup (optional)
-
-Create a Gemini API key in Google AI Studio, then set it in the same terminal that starts Streamlit. Keep it out of Git and browser-side code.
+Open <http://127.0.0.1:8502/>. To run the tests:
 
 ```powershell
-$env:GEMINI_API_KEY = "your-private-key"
+.\.venv\Scripts\python.exe -m unittest -v
 ```
 
-Without a key, the app shows a safe local fallback message. With a key, **Ask The Gaffer for advice** sends only the confirmed structured check-in fields—not the free-text transcript—to Gemini.
+Confirmed records and conversation transcripts are stored locally in `data/submissions.sqlite3`; set `STUDENT_DB_PATH` to choose another database. Students should avoid entering names or other identifying information. The app has no validated performance or wellbeing assessment.
 
-Confirmed structured records, transcripts, record IDs, and illustrative results are saved in `collection_submissions` in `data/submissions.sqlite3`. Older submissions are preserved in previous tables. Set `STUDENT_DB_PATH` to use a different database. Do not enter names or other identifying information in this prototype.
+## Optional Gemini connection
 
-The welcome page links each quote to its UEFA interview. See [COLLECTION_STANDARD.md](COLLECTION_STANDARD.md) for the collection standard, [BACKEND_HANDOFF.md](BACKEND_HANDOFF.md) for the agent interface, and [flowchart.md](flowchart.md) for the flow. The next-phase analysis requirement is recorded in [ANALYSIS_AGENT_BACKLOG.md](ANALYSIS_AGENT_BACKLOG.md) and developed into a proposal in [ANALYSIS_AGENT_DESIGN.md](ANALYSIS_AGENT_DESIGN.md).
+This workstation has a private `.streamlit/secrets.toml` with `GEMINI_API_KEY` and `GEMINI_MODEL`. The file is ignored by Git and must not be committed. On another machine, copy `.streamlit/secrets.toml.example` to `.streamlit/secrets.toml` and fill in a key, or set the `GEMINI_API_KEY` environment variable. The configured model is `gemini-3.5-flash-lite`; change `GEMINI_MODEL` if needed. The API is called only after the student clicks **Ask The Gaffer for Gemini Briefing** on the result page. If the request fails, the local analysis and football match remain available.
+
+See `COLLECTION_STANDARD.md` for collection rules, `BACKEND_HANDOFF.md` for question-agent integration, `ANALYSIS_AGENT_HANDOFF.md` for the processing/Gemini contracts, and `flowchart.md` for the flow. `ANALYSIS_AGENT_DESIGN.md` is a historical design draft with superseded requirements.

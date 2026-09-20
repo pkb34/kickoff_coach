@@ -105,6 +105,18 @@ def assign_demo_personality(answers: dict) -> str:
     return "defender"
 
 
+def assign_local_demo_personality(answers: dict) -> str:
+    """Illustrative football role from time-use answers, without academic marks."""
+    weekly_study = 5 * answers["weekday_study_hours"] + 2 * answers["weekend_study_hours"]
+    if answers["activity_hours"] >= 8 and answers["class_hours"] >= 12:
+        return "captain"
+    if weekly_study >= 18 and answers["activity_hours"] < 8:
+        return "penalty_striker"
+    if weekly_study >= 10 and answers["activity_hours"] >= 3 and answers["sleep_hours"] >= 7:
+        return "midfielder"
+    return "defender"
+
+
 def process_with_agent(answers: dict) -> dict:
     """Temporary rule-based result. Replace this function when an agent is built."""
     busy_hours = answers["study_hours"] + answers["class_hours"] + answers["activity_hours"]

@@ -13,10 +13,11 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
+from databricks_writer import is_write_configured, sync_pending
 from gemini_gateway import is_configured
 from pixel_theme import asset_uri
 from staff_report import MIN_REPORT_CHECKINS, build_staff_snapshot, generate_staff_report
-from storage import DB_PATH
+from storage import DB_PATH, enqueue_existing_databricks_submissions, pending_databricks_count
 
 
 st.set_page_config(page_title="WPTI · Staff overview", layout="wide")
@@ -54,6 +55,22 @@ if st.button("Lock overview"):
 if not DB_PATH.exists():
     st.info("No student check-ins have been saved yet.")
     st.stop()
+
+if st.button("Queue earlier local check-ins for Databricks"):
+    added = enqueue_existing_databricks_submissions()
+    st.success(f"Queued {added} earlier check-ins. Conversation transcripts stay on this device.")
+pending = pending_databricks_count()
+st.caption(f"Check-ins waiting for Databricks: {pending}")
+if pending:
+    if is_write_configured():
+        if st.button("Sync pending check-ins to Databricks"):
+            sync_result = sync_pending(limit=25)
+            if sync_result["status"] == "unavailable":
+                st.warning("Databricks sync is unavailable. Check the SQL warehouse, table permissions, and connection settings.")
+            else:
+                st.success(f"Synced {sync_result['synced']} check-ins; {sync_result['pending']} remain queued.")
+    else:
+        st.info("Databricks sync needs a SQL warehouse HTTP path and local OAuth or token settings. Check-ins remain saved on this device.")
 
 with closing(sqlite3.connect(f"file:{DB_PATH.as_posix()}?mode=ro", uri=True)) as connection:
     rows = connection.execute("SELECT result_json FROM collection_submissions").fetchall()

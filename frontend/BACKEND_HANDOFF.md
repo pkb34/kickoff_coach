@@ -11,14 +11,14 @@ state = answer_question(state, student_reply)  # repeat until status == "complet
 record = structured_record(state)
 ```
 
-`raw_fields` has exactly `activity_type`, `activity_hours`, `class_hours`, `weekday_study_hours`, `weekend_study_hours`, and `sleep_hours`. The first three questions are displayed in the UI, with separate inputs for their subfields. The structured record uses `schema_version: "2.0"`, `baseline`, `followups`, `coverage`, and `question_count`. `state` also contains the ordered `messages` transcript. The UI passes the record and transcript to `storage.save_collection_submission()`.
+`raw_fields` has exactly `activity_type`, `activity_hours`, `class_hours`, `weekday_study_hours`, `weekend_study_hours`, and `sleep_hours`. The first three questions are displayed in the UI, with separate inputs for their subfields. The structured record uses `schema_version: "2.0"`, `baseline`, `followups`, `coverage`, and `question_count`. `state` also contains the ordered `messages` transcript. The UI passes the record and transcript to `storage.save_collection_submission()`. This enqueues the structured record and result for `databricks_writer.sync_pending()`; the transcript remains local. Sync uses the same ID on retry and never sends audio.
 
 The active quiz must not request or record academic marks. A future local model or teammate adapter must keep this scope rule and reject out-of-scope generated questions **before display** and **before saving**. It must also keep the length bounds: three starting groups, seven to eight deeper questions, ten to eleven total in the current design. If the team later changes the count, update the standard, UI, and tests together.
 
 ## Adapter expectations for a later local model
 
 1. Keep a Python entry point that accepts validated baseline fields and prior turns, then returns one student-facing English question plus an updated state.
-2. Run locally on the machine or another explicitly approved local environment. Do not send student answers to GPT or a cloud endpoint.
+2. Run question generation locally on the machine or another explicitly approved local environment. Do not send student answers to GPT for question generation. The separate Databricks storage path for structured answers is described above.
 3. Validate every returned question for scope, length, duplicate intent, and relevance before showing it. If validation fails, use a safe question from the local bank.
 4. Preserve unknown/declined statuses and the original student reply. Do not infer a precise number from vague language.
 5. Keep the seven core coverage areas, including self-reported academic progress and the direct feeling rating, and stop after at most eight deeper questions. Save after all required topics are covered; the UI then opens the result without a separate review screen.

@@ -44,6 +44,11 @@ def _connect() -> sqlite3.Connection:
         transcript_json TEXT NOT NULL,
         result_json TEXT NOT NULL
     )""")
+    connection.execute("""CREATE TABLE IF NOT EXISTS databricks_outbox (
+        submission_id TEXT PRIMARY KEY,
+        synced_at TEXT,
+        FOREIGN KEY (submission_id) REFERENCES collection_submissions(id)
+    )""")
     return connection
 
 
@@ -89,6 +94,9 @@ def save_collection_submission(record: dict, transcript: list[dict], result: dic
                 (record_id, created_at, json.dumps(record, ensure_ascii=False),
                  json.dumps(transcript, ensure_ascii=False), json.dumps(result, ensure_ascii=False)),
             )
+            connection.execute(
+                "INSERT INTO databricks_outbox (submission_id) VALUES (?)", (record_id,)
+            )
     return {
         "id": record_id, "created_at": created_at, "record": record,
         "transcript": transcript, "result": result,
@@ -105,6 +113,48 @@ def update_collection_result(record_id: str, result: dict) -> None:
             )
             if cursor.rowcount != 1:
                 raise ValueError("The saved collection record was not found.")
+            connection.execute(
+                "UPDATE databricks_outbox SET synced_at = NULL WHERE submission_id = ?", (record_id,)
+            )
+
+
+def pending_databricks_submissions(limit: int = 25) -> list[tuple[str, str, str, str]]:
+    """Return unsynced structured records, without local conversation transcripts."""
+    with closing(_connect()) as connection:
+        return connection.execute("""
+            SELECT c.id, c.created_at, c.record_json, c.result_json
+            FROM databricks_outbox AS o
+            JOIN collection_submissions AS c ON c.id = o.submission_id
+            WHERE o.synced_at IS NULL
+            ORDER BY c.created_at, c.id LIMIT ?
+        """, (limit,)).fetchall()
+
+
+def pending_databricks_count() -> int:
+    with closing(_connect()) as connection:
+        return connection.execute(
+            "SELECT COUNT(*) FROM databricks_outbox WHERE synced_at IS NULL"
+        ).fetchone()[0]
+
+
+def enqueue_existing_databricks_submissions() -> int:
+    """Explicit staff action to queue records saved before cloud sync existed."""
+    with closing(_connect()) as connection:
+        with connection:
+            cursor = connection.execute("""
+                INSERT OR IGNORE INTO databricks_outbox (submission_id)
+                SELECT id FROM collection_submissions
+            """)
+            return cursor.rowcount
+
+
+def mark_databricks_synced(record_id: str) -> None:
+    with closing(_connect()) as connection:
+        with connection:
+            connection.execute(
+                "UPDATE databricks_outbox SET synced_at = ? WHERE submission_id = ?",
+                (datetime.now(timezone.utc).isoformat(timespec="seconds"), record_id),
+            )
 
 
 def migrate_legacy_results() -> int:

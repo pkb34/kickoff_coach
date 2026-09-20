@@ -9,6 +9,7 @@ from html import escape
 import streamlit as st
 
 from analysis_agent import analyze_record
+from databricks_writer import sync_pending
 from football_matches import match_football_identity
 from local_question_agent import HOUR_BUCKETS, STARTING_QUESTIONS, answer_question, start_agent, structured_record, validate_baseline
 from pixel_theme import question_scene_html
@@ -46,6 +47,7 @@ def picture_question(question_id: str, title: str, comfort: str, render):
 st.caption("WPTI · YOUR LITTLE CHECK-IN")
 st.title("Let's meet the you behind the jersey ✨")
 st.write("Tap what feels closest. There are no perfect answers here, promise.")
+st.caption("Completed check-ins are saved locally and queued for the team's Databricks workspace. Please leave out names and other identifying details.")
 
 SIDE_NOTES = {
     "activity_balance": "Busy days can pull you in two directions. It is okay to protect your energy, and it is okay to be curious too.",
@@ -197,6 +199,7 @@ else:
                 )
                 result["gemini"] = {"status": "not_requested"}
                 st.session_state["latest_submission"] = save_collection_submission(record, state["messages"], result)
+                st.session_state["databricks_sync_status"] = sync_pending(limit=5)
             except (OSError, sqlite3.Error):
                 st.error("Unable to save your answers locally. Please try again.")
                 st.stop()

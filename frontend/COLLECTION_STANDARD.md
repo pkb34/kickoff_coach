@@ -22,7 +22,7 @@ The current engine uses a fixed question bank and deterministic triggers. Studen
 
 ## Record and handoff
 
-`local_question_agent.structured_record()` returns schema `2.0` with `baseline`, `followups`, `coverage`, and `question_count`. Each baseline field has `status`, `value`, and `unit`; each follow-up has its question, answer/status, and topic. After the final answer, the UI saves the record and transcript in local SQLite and opens the result directly. Students can restart the test; editing individual replies is future work.
+`local_question_agent.structured_record()` returns schema `2.0` with `baseline`, `followups`, `coverage`, and `question_count`. Each baseline field has `status`, `value`, and `unit`; each follow-up has its question, answer/status, and topic. After the final answer, the UI saves the record and transcript in local SQLite and opens the result directly. It queues the structured record and result for the team's Databricks Delta table when configured; the raw conversation transcript and audio are not uploaded. A failed write remains queued locally. Students can restart the test; editing individual replies is future work.
 
 The result is an illustrative football label inferred from four contextual answers, not a validated student assessment. When an axis answer is missing, the type remains unassigned rather than guessed. The happiness index displays only the student's direct rating multiplied by ten; a declined or unknown rating stays unavailable. No sleep or wellbeing prediction is calculated. The optional Gemini future-moments paragraph is a possible scenario, not a prediction.
 

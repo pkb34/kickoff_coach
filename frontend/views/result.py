@@ -8,6 +8,7 @@ import streamlit as st
 
 from campus_resources import recommendations, RESOURCE_CATALOG
 from databricks_gateway import get_demo_telemetry
+from databricks_writer import sync_pending
 from engine import PERSONALITIES
 from gemini_gateway import generate_briefing, is_configured
 from pixel_theme import character_stage
@@ -126,6 +127,7 @@ if analysis and is_configured():
         submission["result"]["gemini"] = briefing
         try:
             update_collection_result(submission["id"], submission["result"])
+            st.session_state["databricks_sync_status"] = sync_pending(limit=5)
         except (OSError, ValueError, sqlite3.Error):
             st.warning("Your reflection is ready, but it could not be saved. You can still read it below.")
         st.rerun()

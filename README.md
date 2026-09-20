@@ -3,6 +3,7 @@
 PitchSide / Kickoff Coach is a Python Streamlit hackathon project with a student-facing football personality experience and separate backend work.
 
 The current frontend is the v8 still-image version. Its welcome page offers the main quiz button and a small link to a separate password-protected staff dashboard. See [`frontend/README.md`](frontend/README.md) for the two local run commands; the dashboard charts display category labels horizontally.
+Completed check-ins now queue locally and sync to a separate Databricks Delta table when a SQL warehouse and access token are configured. See the Databricks storage section of the frontend README for setup and data scope.
 
 ## Frontend prototype
 

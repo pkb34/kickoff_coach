@@ -1,14 +1,14 @@
 # kickoff_coach
 
-PitchSide / Kickoff Coach is a Python Streamlit hackathon MVP that uses a five-question check-in to assign a soccer archetype and create a "Match Fitness" score.
+PitchSide / Kickoff Coach is a Python Streamlit hackathon project with a student-facing football personality experience and separate backend work.
 
 ## Frontend prototype
 
-The Python/Streamlit student-facing prototype lives in [`frontend/`](frontend/). It includes a welcome page, a conversational information check with a rule-based demo collector, and an illustrative football-personality result page. The real information-collection and analysis agents have not been connected yet.
+The Python/Streamlit student-facing prototype lives in [`frontend/`](frontend/). It includes a welcome page, a conversational information check driven by a local rule-based question agent, and a football-personality result page. A local analysis agent prepares descriptive results. Gemini can optionally create a narrative briefing after the student requests it. These agents have not yet been integrated with the separate backend.
 
 Run it from the `frontend` directory using the instructions in [`frontend/README.md`](frontend/README.md). The collection schema and backend integration contract are in [`frontend/COLLECTION_STANDARD.md`](frontend/COLLECTION_STANDARD.md) and [`frontend/BACKEND_HANDOFF.md`](frontend/BACKEND_HANDOFF.md).
 
-The repository root's `Data.py` belongs to the separate backend work and is left unchanged.
+The repository root's `app.py`, `Data.py`, and `setup_databricks.py` belong to the separate backend work. Follow the instructions in `frontend/README.md` to run the student-facing experience.
 
 ## First run: local Python demo
 

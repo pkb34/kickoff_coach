@@ -6,7 +6,7 @@ A three-page Streamlit prototype written in Python. The generated chibi soccer i
 
 1. **Welcome:** the background image, one randomly selected attributed player quote, and the **Start WCPT** button.
 2. **Information check:** a conversational sequence asks about nightly sleep, weekly class hours and GPA, extracurricular hours, and average daily study time on weekdays and weekends. It asks conditional follow-ups, shows coverage, and lets the student correct the extracted record before confirmation.
-3. **Result:** one of four illustrative football personalities (Midfielder, Captain, Penalty Striker, or Defender) when all six numeric baseline values are available. Advice, future GPA/sleep/wellbeing predictions, and support guidance are reserved for later work.
+3. **Result:** one of four illustrative football personalities (Midfielder, Captain, Penalty Striker, or Defender) when all six numeric baseline values are available. The user can ask **The Gaffer** for a Gemini-powered, encouraging briefing based on their confirmed check-in. It is not a prediction, diagnosis, or academic decision.
 
 WCPT means **World Cup Personality Test**. `collection_gateway.py` is the integration point for the future information-collection agent. Today it uses a transparent rule-based demo in `collector.py`. The demo accepts short numeric answers and listed choices, then chooses the next question. It does **not** understand arbitrary natural language. The result is assigned by a small demonstration rule in `engine.py` using the six numeric baseline values only. It is not an AI assessment or a validated prediction. The app does not predict GPA, sleep, or wellbeing.
 
@@ -21,6 +21,16 @@ py -3.14 -m venv .venv
 ```
 
 Open <http://127.0.0.1:8502/>. If the port is occupied, change the port number.
+
+## Gemini setup (optional)
+
+Create a Gemini API key in Google AI Studio, then set it in the same terminal that starts Streamlit. Keep it out of Git and browser-side code.
+
+```powershell
+$env:GEMINI_API_KEY = "your-private-key"
+```
+
+Without a key, the app shows a safe local fallback message. With a key, **Ask The Gaffer for advice** sends only the confirmed structured check-in fields—not the free-text transcript—to Gemini.
 
 Confirmed structured records, transcripts, record IDs, and illustrative results are saved in `collection_submissions` in `data/submissions.sqlite3`. Older submissions are preserved in previous tables. Set `STUDENT_DB_PATH` to use a different database. Do not enter names or other identifying information in this prototype.
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import streamlit as st
 
 from engine import PERSONALITIES, assign_demo_personality
+from gaffer import get_gaffer_advice
 
 
 submission = st.session_state.get("latest_submission")
@@ -45,7 +46,17 @@ if submission.get("record"):
 
 st.divider()
 st.subheader("Advice")
-st.write("Reserved for future personalized advice from the agent.")
+st.write("Ask The Gaffer for an encouraging, non-clinical study-habit and wellbeing briefing based on your confirmed check-in.")
+
+advice_key = f"gaffer_advice_{submission['id']}"
+if st.button("Ask The Gaffer for advice", type="primary", disabled=personality is None):
+    with st.spinner("The Gaffer is reviewing the match tape..."):
+        st.session_state[advice_key] = get_gaffer_advice(submission["record"], personality)
+
+if advice_key in st.session_state:
+    advice = st.session_state[advice_key]
+    st.success(advice["text"])
+    st.caption(f"Advice provider: {advice['provider']}. This is supportive guidance, not medical, mental-health, or academic advice.")
 
 st.subheader("Future Predictions")
 gpa, sleep, wellbeing = st.columns(3)
@@ -55,7 +66,7 @@ wellbeing.metric("Wellbeing", "Coming soon")
 st.caption("No GPA, sleep, or wellbeing prediction is calculated in this version.")
 
 st.subheader("Need Help?")
-st.write("Reserved for future support guidance and referrals.")
+st.write("If you feel overwhelmed or your sleep and workload are consistently difficult to manage, consider reaching out to someone you trust or a campus support resource.")
 
 st.divider()
 back, restart = st.columns(2)

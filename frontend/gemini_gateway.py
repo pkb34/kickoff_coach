@@ -14,10 +14,12 @@ from pathlib import Path
 from urllib import error, request
 
 from analysis_agent import gemini_summary
+from databricks_gateway import gemini_telemetry_summary
 from local_question_agent import PROHIBITED
 
 
-DEFAULT_MODEL = "gemini-3.5-flash-lite"
+# A current, fast, lower-cost text model available through the Gemini API.
+DEFAULT_MODEL = "gemini-2.5-flash-lite"
 SECRETS_PATH = Path(__file__).resolve().parent / ".streamlit" / "secrets.toml"
 ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
@@ -60,8 +62,8 @@ def _validate_briefing(candidate: object, model: str) -> dict:
             "future_moments": future_moments.strip()}
 
 
-def generate_briefing(analysis: dict, *, api_key: str | None = None, model: str | None = None,
-                      opener=None) -> dict:
+def generate_briefing(analysis: dict, telemetry: dict | None = None, *, api_key: str | None = None,
+                      model: str | None = None, opener=None) -> dict:
     """Send the whitelisted summary only and return a validated short briefing."""
     configured_key, configured_model = _settings()
     key = api_key or configured_key
@@ -72,9 +74,21 @@ def generate_briefing(analysis: dict, *, api_key: str | None = None, model: str 
         raise ValueError("Invalid Gemini model name.")
 
     summary = gemini_summary(analysis)
+    telemetry_summary = gemini_telemetry_summary(telemetry)
+    if telemetry_summary:
+        summary["databricks_telemetry"] = telemetry_summary
     prompt = (
-        "You are writing a short, supportive college-student schedule briefing. "
-        "Use only the JSON summary below. Give a factual summary, two practical low-pressure suggestions, "
+        "You are The Gaffer, a warm, friendly football coach helping a college student reflect on their week. "
+        "Speak directly to the student using you and natural contractions, with gentle encouragement "
+        "and at most one playful football metaphor. Be caring and conversational, never clinical, "
+        "judgmental, patronizing, or overly enthusiastic. "
+        "Open by thanking them for taking a moment to check in. Acknowledge that busy or difficult "
+        "weeks can happen without assuming how they feel. Do not minimize a low happiness rating "
+        "or pressure them to be positive. Celebrate the act of reflecting, not invented achievements. "
+        "Make each suggestion a small, achievable invitation using phrases like you could try or "
+        "if it feels helpful. Remind them that one small step is enough and rest counts too. "
+        "Use only the JSON summary below. If databricks_telemetry is present, treat it as synthetic demo telemetry and use it only to gently tailor the advice. "
+        "Give a friendly summary grounded in the reported facts, two practical low-pressure suggestions, "
         "and one future_moments paragraph describing a possible positive moment in the coming week. "
         "Frame that paragraph as a possibility or choice, not as a prediction or guarantee. "
         "Do not invent student facts, assign a new score, diagnose health, predict future outcomes, or discuss academic marks. "
@@ -108,5 +122,5 @@ def generate_briefing(analysis: dict, *, api_key: str | None = None, model: str 
         else:
             message = f"Gemini returned HTTP {exc.code}. Try again later."
         return {"status": "unavailable", "message": message}
-    except (error.URLError, TimeoutError, KeyError, IndexError, ValueError, json.JSONDecodeError) as exc:
+    except (error.URLError, OSError, TimeoutError, KeyError, IndexError, TypeError, ValueError, json.JSONDecodeError):
         return {"status": "unavailable", "message": "Gemini could not produce a valid briefing. Try again later."}

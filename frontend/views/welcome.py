@@ -35,16 +35,16 @@ st.write("")
 st.caption("HOKIE COMPASS PRESENTS")
 st.title("⚽ World Cup Personality Test")
 st.subheader("What kind of player are you?")
-st.write("Answer a short, adaptive information check about your week. Your answers determine which details we ask about next before showing an illustrative football personality.")
+st.write("Tell us a little about your week. We'll ask a few follow-ups, then show you your soccer-style match.")
 
 st.divider()
-st.markdown(f'> “{quote}”')
+st.write(f"“{quote}”")
 st.caption(f"— [{player}]({source})")
 st.divider()
 
 left, center, right = st.columns([1, 2, 1])
 with center:
-    if st.button("Start WCPT", type="primary", use_container_width=True):
+    if st.button("Let's play", type="primary", use_container_width=True):
         st.switch_page("views/quiz.py")
 
-st.caption("WCPT = World Cup Personality Test · For demonstration only")
+st.caption("Just a fun demo — not a real assessment.")

@@ -29,7 +29,7 @@ class AppTests(unittest.TestCase):
             try:
                 app = AppTest.from_file("app.py").run()
                 self.assertFalse(app.exception)
-                self.assertEqual(app.button[0].label, "Start WCPT")
+                self.assertEqual(app.button[0].label, "Let's play")
 
                 app.switch_page("views/quiz.py").run()
                 self.assertFalse(app.exception)
@@ -54,7 +54,7 @@ class AppTests(unittest.TestCase):
                 app.session_state["latest_submission"] = storage.save_collection_submission(record, state["messages"], result)
                 app.switch_page("views/result.py").run()
                 self.assertFalse(app.exception)
-                self.assertEqual(len(app.metric), 6)
+                self.assertEqual(len(app.metric), 3)
                 self.assertFalse(any("GPA" in metric.label for metric in app.metric))
             finally:
                 storage.DB_PATH = old_path

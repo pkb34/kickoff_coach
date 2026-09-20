@@ -7,8 +7,10 @@ import sqlite3
 import streamlit as st
 
 from engine import PERSONALITIES, assign_demo_personality
+from databricks_gateway import get_demo_telemetry
 from gemini_gateway import generate_briefing, is_configured
 from storage import update_collection_result
+from pixel_theme import archetype_heading
 
 
 submission = st.session_state.get("latest_submission")
@@ -26,10 +28,10 @@ if status == "demo_personality":
     if not personality_key and "answers" in submission:
         personality_key = assign_demo_personality(submission["answers"])
     personality = PERSONALITIES[personality_key]
-    st.title(f"{personality['icon']} {personality['name']}")
+    st.html(archetype_heading(personality_key, personality["name"]))
     st.subheader(personality["tagline"])
     st.write(personality["description"])
-    st.info("This is an illustrative personality match for the prototype. It is not an AI assessment or a prediction.")
+    st.info("This is a fun personality match, not a prediction or a real assessment.")
     if submission.get("record", {}).get("schema_version") == "2.0":
         count = submission["record"]["question_count"]
         st.caption(f"You completed {count['starting']} starting questions and {count['deep']} adaptive follow-ups. This is an illustrative football role, not an assessment.")
@@ -42,25 +44,12 @@ else:
     st.title("Information Check Complete")
     st.warning("Your record was saved, but some numeric details were unavailable. This demo cannot assign a football personality without inventing answers.")
 
-left, right = st.columns(2)
-left.metric("Record ID", submission["id"])
-right.metric("Personality", personality["name"] if personality else "Not assigned")
-
 if submission.get("record"):
     with st.expander("View collected information"):
         st.json(submission["record"])
 
 analysis = submission.get("result", {}).get("analysis")
 football_match = submission.get("result", {}).get("football_match")
-
-st.divider()
-st.subheader("Your Happiness Index")
-if analysis:
-    happiness = analysis["metrics"]["self_reported_happiness_index"]
-    st.metric("Self-reported happiness", f"{happiness}/100" if happiness is not None else "Not reported")
-    st.caption("This is your own seven-day 0–10 rating multiplied by ten. It is not a clinical measure or a prediction.")
-else:
-    st.write("A self-reported happiness rating is not available for this earlier record.")
 
 if analysis:
     st.subheader("Your Week in Numbers")
@@ -77,12 +66,6 @@ if analysis:
 
 if football_match:
     st.divider()
-    st.subheader("Your National Team Match")
-    st.markdown(f"### {football_match['national_team']}")
-    st.write(football_match["team_style"])
-    st.write(football_match["team_description"])
-    st.caption(f"[Football style source]({football_match['team_source']})")
-
     st.subheader("Your Player Analogy")
     st.markdown(f"### {football_match['player']}")
     st.write(football_match["player_explanation"])
@@ -90,14 +73,30 @@ if football_match:
     st.caption("These football matches are illustrative analogies, not measured personality traits.")
 
 st.divider()
-st.subheader("Future Moments")
-st.write("Gemini can draft a possible next-week moment from a compact summary of your reported time and self-rating. This is a scenario, not a forecast.")
-st.caption("The Gaffer is your optional football-themed briefing voice.")
-st.caption("Only numeric summary fields and answer-availability flags are sent when you click. Free-text answers and the conversation transcript stay local.")
+st.subheader("Ask The Gaffer")
+st.write("Want a little encouragement for the week ahead? The Gaffer can make you a simple game plan.")
+st.caption("Only a small summary is shared when you click. Your full answers stay here.")
 if analysis and is_configured():
-    if st.button("Ask The Gaffer for Gemini Briefing", type="primary", use_container_width=True):
-        with st.spinner("Drafting your briefing..."):
-            briefing = generate_briefing(analysis)
+    if st.button("Get my game plan", type="primary", use_container_width=True):
+        with st.spinner("The Gaffer is thinking..."):
+            try:
+                telemetry = get_demo_telemetry()
+            except (OSError, TypeError, ValueError):
+                telemetry = {
+                    "status": "unavailable",
+                    "message": "Databricks could not load the demo telemetry right now.",
+                }
+            try:
+                briefing = generate_briefing(analysis, telemetry)
+            except (OSError, TypeError, ValueError, KeyError, IndexError):
+                briefing = {
+                    "status": "unavailable",
+                    "message": "The Gaffer could not make a game plan right now. Please try again in a moment.",
+                }
+        if telemetry.get("status") == "available":
+            briefing["databricks_source"] = telemetry["source"]
+        elif telemetry.get("status") == "unavailable":
+            briefing["databricks_note"] = telemetry.get("message", "Databricks telemetry was unavailable, so this plan uses your quiz answers only.")
         submission["result"]["gemini"] = briefing
         try:
             update_collection_result(submission["id"], submission["result"])
@@ -105,12 +104,19 @@ if analysis and is_configured():
             st.warning("The briefing was generated but could not be saved locally.")
         st.rerun()
 elif analysis:
-    st.info("Gemini is not configured on this server. The local analysis and football match remain available.")
+    st.info(
+        "The Gaffer isn't connected yet. Add GEMINI_API_KEY to "
+        "frontend/.streamlit/secrets.toml, then restart the app."
+    )
 
 briefing = submission.get("result", {}).get("gemini", {})
 if briefing.get("status") == "generated":
+    if briefing.get("databricks_source"):
+        st.caption(f"Personalized with approved synthetic telemetry from {briefing['databricks_source']}.")
+    elif briefing.get("databricks_note"):
+        st.caption(briefing["databricks_note"])
     st.write(briefing["future_moments"])
-    st.subheader("Advice")
+    st.subheader("A little encouragement from The Gaffer")
     st.write(briefing["summary"])
     for idea in briefing["suggestions"]:
         st.write(f"• {idea}")
@@ -118,11 +124,11 @@ if briefing.get("status") == "generated":
 elif briefing.get("status") == "unavailable":
     st.warning(briefing["message"])
 
-st.subheader("Future Predictions")
-st.write("No numerical future outcome is predicted from one check-in.")
+st.subheader("One quick note")
+st.write("This app isn't trying to predict your future — it's here to help you reflect on your week.")
 
-st.subheader("Need Help?")
-st.write("Reserved for future support guidance and referrals.")
+st.subheader("Need a hand?")
+st.write("If things feel tough, talking with someone you trust or a campus resource can be a great next step.")
 
 st.divider()
 back, restart = st.columns(2)

@@ -60,12 +60,28 @@ class AnalysisAgentTests(unittest.TestCase):
             })}]}}]}
             return Response(json.dumps(payload).encode("utf-8"))
 
-        briefing = generate_briefing(analysis, api_key="test-key", opener=opener)
+        telemetry = {
+            "status": "available",
+            "study_hours": 12,
+            "extracurricular_count": 2,
+            "credit_hours": 15,
+            "assignment_start_style": "Early",
+            "student_id": "VT-DEMO-001",
+            "primary_struggle": "Private source field",
+        }
+        briefing = generate_briefing(analysis, telemetry, api_key="test-key", opener=opener)
         self.assertEqual(briefing["status"], "generated")
         self.assertIn("future_moments", briefing)
         self.assertEqual(sent["header"], "test-key")
         self.assertNotIn("Private test phrase", sent["body"])
         self.assertNotIn("volunteering", sent["body"])
+        self.assertIn("databricks_telemetry", sent["body"])
+        self.assertIn("weekly_study_hours", sent["body"])
+        self.assertIn("extracurricular_count", sent["body"])
+        self.assertIn("credit_hours", sent["body"])
+        self.assertIn("assignment_start_style", sent["body"])
+        self.assertNotIn("VT-DEMO-001", sent["body"])
+        self.assertNotIn("Private source field", sent["body"])
         self.assertEqual(gemini_summary(analysis)["self_reported_happiness_index"], 70)
 
     def test_api_rejection_does_not_break_local_analysis(self):

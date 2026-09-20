@@ -14,22 +14,22 @@ PERSONALITIES = {
     "midfielder": {
         "name": "Midfielder", "icon": "🧭",
         "tagline": "The connector who keeps the game moving",
-        "description": "In this demo, your mix of study, activities, and rest maps to the player who links different parts of the field.",
+        "description": "You are the link between every part of the pitch. Your answers suggest that you are at your best when study, activities, and recovery all have a place in the same game plan. Keep checking in with your energy so you can continue making steady progress without trying to cover the whole field alone.",
     },
     "captain": {
         "name": "Captain", "icon": "🫡",
         "tagline": "The team-minded organizer",
-        "description": "In this demo, your time in group-oriented activities maps to the player who helps organize the team.",
+        "description": "You naturally bring structure to a busy team sheet. Your answers point to someone who can balance a full schedule while showing up for the people and communities around them. A captain also protects their own time, so leave room in your week for a reset between commitments.",
     },
     "penalty_striker": {
         "name": "Penalty Striker", "icon": "🎯",
         "tagline": "The focused finisher",
-        "description": "In this demo, your independent study commitment maps to the player who concentrates on a key moment.",
+        "description": "You are built for focused moments. Your answers suggest that when it is time to study, you can narrow in on the task in front of you and follow through. Pair that focus with short breaks and a realistic plan so every big deadline does not have to feel like a final-minute penalty.",
     },
     "defender": {
         "name": "Defender", "icon": "🛡️",
         "tagline": "The steady last line",
-        "description": "In this demo, your current schedule maps to the player who brings steadiness and protects the team shape.",
+        "description": "You bring calm and reliability to the back line. Your answers suggest a routine that values stability over rushing from one commitment to the next. Build on that strength by setting one small academic goal at a time and asking for support when a challenge starts to feel too big to defend alone.",
     },
 }
 

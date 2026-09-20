@@ -18,15 +18,15 @@ from storage import save_collection_submission
 
 st.caption("WCPT · LOCAL QUESTION AGENT")
 st.title("⚽ Tell Us About Your Week")
-st.write("Begin with three short questions. A local question agent then chooses follow-ups based on your answers.")
-st.info("Question selection runs locally. On the result page, you may choose to send a small numeric summary to Gemini for a briefing; raw replies stay local. Please avoid entering names or other identifying details.")
+st.write("Start with three quick questions. Then we'll ask a few more based on what you share.")
+st.info("Your answers stay here. If you ask The Gaffer for advice later, we'll only send a small summary — never your name or full responses.")
 
 state = st.session_state.get("local_agent_state")
 
 if state is None:
     prior = st.session_state.get("starting_answers", {})
     st.subheader("Three starting questions")
-    st.caption("Enter a number of hours, 'I don't know', or 'Prefer not to say' for a field you cannot answer.")
+    st.caption("Use a number of hours. Not sure? You can type “I don't know” or “Prefer not to say.”")
     with st.form("three_starting_questions"):
         st.markdown(f"**1. {STARTING_QUESTIONS[0]}**")
         activity_type = st.text_input("Main activity type", value=prior.get("activity_type", ""), placeholder="e.g. soccer club, volunteering, or none")
@@ -41,7 +41,7 @@ if state is None:
         st.divider()
         st.markdown(f"**3. {STARTING_QUESTIONS[2]}**")
         sleep_hours = st.text_input("Average sleep hours per night", value=prior.get("sleep_hours", ""), placeholder="e.g. 7.5")
-        submitted = st.form_submit_button("Start Personalized Follow-ups", type="primary", use_container_width=True)
+        submitted = st.form_submit_button("Keep going", type="primary", use_container_width=True)
 
     if submitted:
         raw = {
@@ -94,10 +94,10 @@ else:
     else:
         record = structured_record(state)
         st.subheader("Review your information")
-        st.write("Your three starting answers and follow-up responses are ready to save. You can inspect the structured record first.")
+        st.write("You're all set. Take a quick look, then see your result.")
         with st.expander("Preview complete structured record"):
             st.json(record)
-        if st.button("Confirm and See My Result", type="primary", use_container_width=True):
+        if st.button("See my result", type="primary", use_container_width=True):
             try:
                 baseline = baseline_for_demo_personality(record)
                 result = (
@@ -119,4 +119,4 @@ else:
         st.session_state.pop("latest_submission", None)
         st.rerun()
 
-st.caption("The local question agent is a rule-based prototype. Its questions and the football result are not validated assessments.")
+st.caption("This is a fun, rule-based demo — not a real assessment.")
